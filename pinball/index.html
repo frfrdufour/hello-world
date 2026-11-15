@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gravewick Manor Pinball</title>
+  <meta name="description" content="An original haunted-mansion pinball table with a Classic mode and a rule-bending Haunted mode.">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <aside id="left">
+      <header>
+        <p class="eyebrow">An original pinball table</p>
+        <h1>Gravewick Manor</h1>
+      </header>
+
+      <div class="backbox">
+        <canvas id="dmd" aria-label="Score display"></canvas>
+      </div>
+
+      <section class="card">
+        <div class="toggle-row">
+          <div>
+            <p class="label">Mode</p>
+            <p id="modeName" class="mode-name">Classic</p>
+          </div>
+          <button id="modeToggle" class="switch" role="switch" aria-checked="false" aria-label="Haunted mode">
+            <span class="knob"></span>
+          </button>
+        </div>
+        <p id="modeHint" class="hint">Pure 90s pinball. Real-world physics and nothing else.</p>
+        <div class="haunted-only">
+          <div class="meter-row"><span>Ectoplasm ink</span><span class="meter"><span id="inkBar"></span></span></div>
+          <div class="meter-row"><span>Time rewind</span><span id="rewinds">x1</span></div>
+        </div>
+      </section>
+
+      <section class="card sound">
+        <button id="muteBtn" aria-pressed="true">Sound <kbd>M</kbd></button>
+        <button id="musicBtn" aria-pressed="true">Music <kbd>N</kbd></button>
+        <button id="voiceBtn" aria-pressed="true">Voices <kbd>V</kbd></button>
+      </section>
+    </aside>
+
+    <main>
+      <canvas id="table" aria-label="Pinball table"></canvas>
+      <p id="pauseNote" hidden>Paused. Press P or click to resume.</p>
+    </main>
+
+    <aside id="right">
+      <section class="card">
+        <h2>Controls</h2>
+        <dl class="keys">
+          <dt><kbd>Left Shift</kbd> <kbd>Z</kbd> <kbd>&larr;</kbd></dt><dd>Left flipper</dd>
+          <dt><kbd>Right Shift</kbd> <kbd>/</kbd> <kbd>&rarr;</kbd></dt><dd>Right flipper</dd>
+          <dt><kbd>Space</kbd> <kbd>&darr;</kbd></dt><dd>Plunger (hold, then release)</dd>
+          <dt><kbd>X</kbd> <kbd>&uarr;</kbd></dt><dd>Nudge (too much tilts)</dd>
+          <dt><kbd>Enter</kbd></dt><dd>Start game</dd>
+          <dt><kbd>H</kbd></dt><dd>Classic / Haunted</dd>
+          <dt><kbd>P</kbd></dt><dd>Pause</dd>
+        </dl>
+        <dl class="keys haunted-only">
+          <dt><kbd>R</kbd></dt><dd>Rewind time</dd>
+          <dt>Mouse drag</dt><dd>Draw a ghost wall</dd>
+        </dl>
+      </section>
+
+      <section class="card">
+        <h2>How to score</h2>
+        <ul class="rules">
+          <li><b>R-I-P targets</b> open the Crypt. Shoot it to explore a room.</li>
+          <li><b>Six rooms</b> light the manor windows. Explore all six for Midnight Madness.</li>
+          <li><b>B-A-T targets</b> light the lock. Lock three balls for Ghost Multiball.</li>
+          <li><b>B-O-O lanes</b> raise your bonus multiplier. Flippers shift the lit lanes.</li>
+          <li><b>Hit Grimble</b> the gargoyle. He hates it.</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
