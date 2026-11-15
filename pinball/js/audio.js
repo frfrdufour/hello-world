@@ -265,26 +265,28 @@ export class AudioSys {
   // Spoken lines. host = the Caretaker, vesper = the medium, grim = the gargoyle.
   say(text, role = 'host', pri = 1) {
     if (!this.voiceOn || this.muted || !this.ctx || !('speechSynthesis' in window)) return;
-    const ss = window.speechSynthesis;
-    if (ss.speaking || ss.pending) {
-      if (pri < 2) return;
-      ss.cancel();
-    }
-    const u = new SpeechSynthesisUtterance(text);
-    const en = this.voices.filter(v => /^en/i.test(v.lang));
-    const female = en.find(v => /female|zira|samantha|victoria|karen|moira|susan|hazel|serena/i.test(v.name));
-    const male = en.find(v => /\bmale|david|daniel|alex|fred|george|james|arthur/i.test(v.name));
-    if (role === 'vesper') {
-      if (female) u.voice = female;
-      u.pitch = 1.2; u.rate = 0.92;
-    } else if (role === 'grim') {
-      if (male) u.voice = male;
-      u.pitch = 0.55; u.rate = 1.15;
-    } else {
-      if (male) u.voice = male;
-      u.pitch = 0.1; u.rate = 0.74;
-    }
-    u.volume = 0.95;
-    ss.speak(u);
+    try {
+      const ss = window.speechSynthesis;
+      if (ss.speaking || ss.pending) {
+        if (pri < 2) return;
+        ss.cancel();
+      }
+      const u = new SpeechSynthesisUtterance(text);
+      const en = this.voices.filter(v => /^en/i.test(v.lang));
+      const female = en.find(v => /female|zira|samantha|victoria|karen|moira|susan|hazel|serena/i.test(v.name));
+      const male = en.find(v => /\bmale|david|daniel|alex|fred|george|james|arthur/i.test(v.name));
+      if (role === 'vesper') {
+        if (female) u.voice = female;
+        u.pitch = 1.2; u.rate = 0.92;
+      } else if (role === 'grim') {
+        if (male) u.voice = male;
+        u.pitch = 0.55; u.rate = 1.15;
+      } else {
+        if (male) u.voice = male;
+        u.pitch = 0.1; u.rate = 0.74;
+      }
+      u.volume = 0.95;
+      ss.speak(u);
+    } catch (e) { /* speech not available here */ }
   }
 }
