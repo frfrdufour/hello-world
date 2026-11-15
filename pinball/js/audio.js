@@ -21,6 +21,8 @@ export class AudioSys {
     this.intense = false;
     this.step = 0;
     this.voices = [];
+    this.voiceName = '';
+    this.onVoices = null;
   }
 
   init() {
@@ -49,7 +51,7 @@ export class AudioSys {
     this.nextT = ctx.currentTime + 0.2;
     setInterval(() => this.schedule(), 60);
     if ('speechSynthesis' in window) {
-      const load = () => { this.voices = speechSynthesis.getVoices(); };
+      const load = () => { this.voices = speechSynthesis.getVoices(); if (this.onVoices) this.onVoices(); };
       load();
       speechSynthesis.onvoiceschanged = load;
     }
@@ -215,10 +217,77 @@ export class AudioSys {
         this.tone({ f: 500, f2: 1500, dur: 0.25, vol: 0.2, type: 'triangle' });
         this.tone({ f: 500, f2: 250, dur: 0.25, vol: 0.2, type: 'triangle' });
         break;
+      case 'rampUp':
+        this.noise({ dur: 0.35, vol: 0.22, f: 500, f2: 2600, q: 2 });
+        break;
+      case 'ramp':
+        [440, 587, 740, 880].forEach((f, i) =>
+          this.tone({ type: 'triangle', f, dur: 0.14, vol: 0.22, at: now + i * 0.05 }));
+        break;
+      case 'rampDrop':
+        this.tone({ f: 150, f2: 80, dur: 0.07, vol: 0.3 });
+        this.noise({ dur: 0.03, vol: 0.2, f: 1400 });
+        break;
+      case 'laugh':
+        this.laugh();
+        break;
       case 'bonus':
         this.tone({ type: 'square', f: 880, dur: 0.05, vol: 0.12, lp: 3000 });
         break;
     }
+  }
+
+  // A sinister laugh built from a buzzing source and two vowel filters.
+  laugh() {
+    const ctx = this.ctx, t0 = ctx.currentTime + 0.02;
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    const mix = ctx.createGain();
+    mix.gain.value = 0.9;
+    for (const [f, q, v] of [[720, 7, 1], [1150, 9, 0.6], [2500, 8, 0.25]]) {
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+      const bg = ctx.createGain();
+      bg.gain.value = v;
+      o.connect(bp); bp.connect(bg); bg.connect(g);
+    }
+    g.connect(mix); mix.connect(this.sfxBus);
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const t = t0 + i * 0.17 + i * i * 0.006;
+      const f = 150 - i * 9;
+      o.frequency.setValueAtTime(f * 1.25, t);
+      o.frequency.exponentialRampToValueAtTime(f, t + 0.11);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(1.2 - i * 0.1, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+    }
+    o.start(t0);
+    o.stop(t0 + n * 0.2 + 0.4);
+  }
+
+  // Pick the most natural voices this browser offers.
+  rank(v, want) {
+    let s = 0;
+    const n = v.name;
+    if (/natural|neural|enhanced|premium|siri/i.test(n)) s += 6;
+    if (/google|online/i.test(n)) s += 3;
+    if (/en[-_]GB/i.test(v.lang)) s += 2;
+    if (want.test(n)) s += 4;
+    if (/espeak|compact|albert|bad news|good news|bells|boing|bubbles|cellos|whisper|zarvox|trinoids|organ|jester|superstar|wobble|bahh|junior|ralph|fred|kathy|princess/i.test(n)) s -= 20;
+    return s;
+  }
+
+  bestVoice(want) {
+    const en = this.voices.filter(v => /^en/i.test(v.lang));
+    if (!en.length) return null;
+    if (this.voiceName) {
+      const chosen = en.find(v => v.name === this.voiceName);
+      if (chosen) return chosen;
+    }
+    return en.slice().sort((a, b) => this.rank(b, want) - this.rank(a, want))[0];
   }
 
   // Music scheduler: six eighth-note steps per bar.
@@ -272,18 +341,17 @@ export class AudioSys {
         ss.cancel();
       }
       const u = new SpeechSynthesisUtterance(text);
-      const en = this.voices.filter(v => /^en/i.test(v.lang));
-      const female = en.find(v => /female|zira|samantha|victoria|karen|moira|susan|hazel|serena/i.test(v.name));
-      const male = en.find(v => /\bmale|david|daniel|alex|fred|george|james|arthur/i.test(v.name));
+      const female = this.bestVoice(/female|samantha|serena|sonia|libby|aria|jenny|kate|moira|karen|michelle|zira|hazel|victoria/i);
+      const male = this.bestVoice(/\bmale|daniel|arthur|oliver|ryan|george|guy|christopher|eric|brian|david|james|alex/i);
       if (role === 'vesper') {
-        if (female) u.voice = female;
-        u.pitch = 1.2; u.rate = 0.92;
+        if (female) { u.voice = female; u.lang = female.lang; }
+        u.pitch = 1.05; u.rate = 0.95;
       } else if (role === 'grim') {
-        if (male) u.voice = male;
-        u.pitch = 0.55; u.rate = 1.15;
+        if (male) { u.voice = male; u.lang = male.lang; }
+        u.pitch = 0.5; u.rate = 1.1;
       } else {
-        if (male) u.voice = male;
-        u.pitch = 0.1; u.rate = 0.74;
+        if (male) { u.voice = male; u.lang = male.lang; }
+        u.pitch = 0.72; u.rate = 0.86;
       }
       u.volume = 0.95;
       ss.speak(u);

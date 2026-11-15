@@ -384,31 +384,13 @@ export class Renderer {
     // Flippers.
     for (const f of g.world.flippers) this.drawFlipper(c, f, th);
 
-    // Balls.
-    for (const b of balls) {
-      if (b.held > 0) continue;
-      if (b.ghost) {
-        c.globalAlpha = Math.min(0.75, b.life / 2);
-        const gr = c.createRadialGradient(b.x - 4, b.y - 4, 1, b.x, b.y, b.r);
-        gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#3ef5a0');
-        c.fillStyle = gr;
-        c.beginPath(); c.arc(b.x, b.y, b.r, 0, TAU); c.fill();
-        c.globalAlpha = 1;
-        continue;
-      }
-      if (g.haunted) {
-        c.fillStyle = `rgba(${th.glow},0.16)`;
-        for (let k = 1; k <= 4; k++) {
-          c.beginPath(); c.arc(b.x - b.vx * 0.006 * k, b.y - b.vy * 0.006 * k, b.r * (1 - k * 0.13), 0, TAU); c.fill();
-        }
-      }
-      c.fillStyle = 'rgba(0,0,0,0.35)';
-      c.beginPath(); c.arc(b.x + 3, b.y + 4, b.r, 0, TAU); c.fill();
-      const gr = c.createRadialGradient(b.x - 5, b.y - 6, 1, b.x, b.y, b.r);
-      gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.35, '#cfd3da'); gr.addColorStop(1, '#4d5260');
-      c.fillStyle = gr;
-      c.beginPath(); c.arc(b.x, b.y, b.r, 0, TAU); c.fill();
-    }
+    // Kickback light.
+    this.light(c, 39, 885, 7, fl('kick') || g.kickback ? 1 : 0, th, '#ff5a5a');
+
+    // Balls on the playfield, then the ramps above them, then balls riding the ramps.
+    for (const b of balls) if (b.held <= 0 && !b.rampId) this.drawBall(c, b, g, th, 1);
+    this.drawRamps(c, g, th, fl, blink);
+    for (const b of balls) if (b.held <= 0 && b.rampId) this.drawBall(c, b, g, th, 1.12);
 
     // Sparks.
     for (const p of g.particles) {
@@ -481,6 +463,81 @@ export class Renderer {
       c.textAlign = 'center';
       c.font = `bold ${Math.round(26 * this.dpr)}px Georgia, serif`;
       c.fillText('<<  REWIND', cv.width / 2, cv.height * 0.3);
+    }
+  }
+
+  drawBall(c, b, g, th, k) {
+    const r = b.r * k;
+    if (b.ghost) {
+      c.globalAlpha = Math.min(0.75, b.life / 2);
+      const gr = c.createRadialGradient(b.x - 4, b.y - 4, 1, b.x, b.y, r);
+      gr.addColorStop(0, '#fff'); gr.addColorStop(1, '#3ef5a0');
+      c.fillStyle = gr;
+      c.beginPath(); c.arc(b.x, b.y, r, 0, TAU); c.fill();
+      c.globalAlpha = 1;
+      return;
+    }
+    if (g.haunted) {
+      c.fillStyle = `rgba(${th.glow},0.16)`;
+      for (let i = 1; i <= 4; i++) {
+        c.beginPath(); c.arc(b.x - b.vx * 0.006 * i, b.y - b.vy * 0.006 * i, r * (1 - i * 0.13), 0, TAU); c.fill();
+      }
+    }
+    const lift = k > 1 ? 7 : 0;
+    c.fillStyle = 'rgba(0,0,0,0.35)';
+    c.beginPath(); c.arc(b.x + 3 + lift, b.y + 4 + lift, r, 0, TAU); c.fill();
+    const gr = c.createRadialGradient(b.x - 5, b.y - 6, 1, b.x, b.y, r);
+    gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.35, '#cfd3da'); gr.addColorStop(1, '#4d5260');
+    c.fillStyle = gr;
+    c.beginPath(); c.arc(b.x, b.y, r, 0, TAU); c.fill();
+  }
+
+  drawRamps(c, g, th, fl, blink) {
+    for (const r of this.table.ramps) {
+      if (!r.rails) {
+        r.rails = [[], []];
+        for (let i = 0; i < r.pts.length; i++) {
+          const a = r.pts[Math.max(0, i - 1)], b = r.pts[Math.min(r.pts.length - 1, i + 1)];
+          const d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+          const nx = -(b[1] - a[1]) / d, ny = (b[0] - a[0]) / d;
+          r.rails[0].push([r.pts[i][0] + nx * 16, r.pts[i][1] + ny * 16]);
+          r.rails[1].push([r.pts[i][0] - nx * 16, r.pts[i][1] - ny * 16]);
+        }
+      }
+      const f = fl('ramp' + r.id);
+      const [L, R] = r.rails;
+      // Shadow on the playfield.
+      c.save(); c.translate(6, 8);
+      c.strokeStyle = 'rgba(0,0,0,0.22)'; c.lineWidth = 30; c.lineCap = 'butt'; c.lineJoin = 'round';
+      c.beginPath(); r.pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
+      c.restore();
+      // Clear plastic floor.
+      c.beginPath();
+      L.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+      for (let i = R.length - 1; i >= 0; i--) c.lineTo(R[i][0], R[i][1]);
+      c.closePath();
+      c.fillStyle = f ? `rgba(${th.glow},${0.25 * f + 0.1})` : g.haunted ? 'rgba(90,255,200,0.09)' : 'rgba(255,255,255,0.1)';
+      c.fill();
+      // Cross ties and rails.
+      c.strokeStyle = g.haunted ? 'rgba(160,255,235,0.35)' : 'rgba(235,235,245,0.35)';
+      c.lineWidth = 1.2;
+      c.beginPath();
+      for (let i = 0; i < L.length; i += 5) { c.moveTo(L[i][0], L[i][1]); c.lineTo(R[i][0], R[i][1]); }
+      c.stroke();
+      c.lineWidth = 3; c.lineCap = 'round'; c.lineJoin = 'round';
+      c.strokeStyle = f ? '#ffffff' : g.haunted ? 'rgba(170,255,238,0.9)' : 'rgba(225,228,238,0.9)';
+      for (const rail of [L, R]) {
+        c.beginPath(); rail.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.stroke();
+      }
+      // Entrance arrow and name.
+      const gx = (r.gate.x1 + r.gate.x2) / 2;
+      const on = f || (g.multiball && blink) || (g.comboT > 0 && g.lastRamp !== r.id && blink);
+      c.fillStyle = on ? th.lit : th.unlit;
+      c.beginPath(); c.moveTo(gx, 486); c.lineTo(gx - 11, 508); c.lineTo(gx + 11, 508); c.closePath(); c.fill();
+      c.fillStyle = th.text; c.globalAlpha = 0.6;
+      c.font = 'bold 8px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(r.name, gx, 520);
+      c.globalAlpha = 1;
     }
   }
 

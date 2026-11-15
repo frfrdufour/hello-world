@@ -1,6 +1,6 @@
 // Rules, scoring and the two modes (Classic and Haunted).
 import { makeBall, makeSeg, GRAV } from './physics.js';
-import { W, H, SCOOP, PORTALS } from './table.js';
+import { W, H, SCOOP, PORTALS, rampPos } from './table.js';
 
 const SUB = 1 / 1000;
 const SAVE_KEY = 'gravewick-hi';
@@ -71,6 +71,7 @@ export class Game {
       tiltM: 0, tilted: false, spinV: 0, spinA: 0,
       serveQ: 0, serveT: 0, charge: 0, charging: false,
       scoopCool: 0, orbitCool: 0, lastSplit: 0, lastKnock: 0, lastSaveMsg: -9,
+      rampCount: 0, combo: 0, comboT: 0, lastRamp: 0, kickback: true,
       shake: 0, bonusT: 0, overT: 0, newHi: false, usedHaunted: false,
     });
     this.world.balls.length = 0;
@@ -124,7 +125,7 @@ export class Game {
   newBall() {
     Object.assign(this, {
       tilted: false, tiltM: 0, bonus: 0, bonusX: 1, boo: [0, 0, 0],
-      ballLive: false, saveT: 0, rewindCharge: 1, ink: 400,
+      ballLive: false, saveT: 0, rewindCharge: 1, ink: 400, kickback: true, combo: 0,
     });
     if (this.room < 0) this.cryptLit = true;
     this.msg(['BALL ' + this.ball, 'HOLD SPACE TO PLUNGE'], 2.5);
@@ -314,6 +315,20 @@ export class Game {
       }
     } else if (b.x > 466 && b.y > 900) b.inLane = true;
 
+    if (b.vy < -500) {
+      for (const r of this.table.ramps) {
+        const g = r.gate;
+        if (b.py >= g.y && b.y < g.y && b.x > g.x1 && b.x < g.x2) {
+          const p = rampPos(r, 0);
+          b.rampId = r.id; b.rs = 0; b.rc = 0;
+          b.rv = Math.min(1900, Math.hypot(b.vx, b.vy));
+          b.x = p.x; b.y = p.y;
+          this.audio.sfx('rampUp');
+          return;
+        }
+      }
+    }
+
     for (const s of this.table.sensors) {
       const dx = b.x - s.x, dy = b.y - s.y;
       const inside = dx * dx + dy * dy < s.r * s.r;
@@ -374,7 +389,15 @@ export class Game {
         this.add(1000); this.sw(); A.sfx('roll');
         break;
       case 'outlane':
-        this.add(5000); this.sw(); A.sfx('outlane');
+        this.add(5000); this.sw();
+        if (s.id === 'ol' && this.kickback && !this.tilted) {
+          this.kickback = false;
+          b.x = 39; b.vx = 0; b.vy = -2700;
+          this.fl('kick', 0.5);
+          A.sfx('eject');
+          this.msg(['KICKBACK', 'THE BUTLER SAVES YOU'], 1.6);
+          A.say('Allow me.', 'host');
+        } else A.sfx('outlane');
         break;
       case 'scoop':
         if (!b.ghost && this.t > this.scoopCool) this.scoop(b);
@@ -390,6 +413,62 @@ export class Game {
     else {
       this.add(this.room === 3 ? 100000 : 10000);
       this.audio.sfx('orbit');
+    }
+  }
+
+  // Move a ball along its ramp. Slow shots roll back down, like the real thing.
+  rampStep(b, dt) {
+    const r = this.table.ramps[b.rampId - 1];
+    for (let k = 0; k < 4; k++) {
+      const h = dt / 4;
+      const p = rampPos(r, b.rs);
+      const climb = b.rs < r.crest ? 1.7 : 1;
+      b.rv += (this.world.gx * p.tx + this.world.gy * p.ty) * climb * h;
+      b.rv *= 1 - 0.3 * h;
+      if (b.rs >= r.crest && b.rv > 950) b.rv = 950;
+      b.rs += b.rv * h;
+      if (!b.rc && b.rs >= r.crest) { b.rc = 1; this.rampMade(r); }
+    }
+    if (b.rs >= r.total) {
+      const p = rampPos(r, r.total);
+      b.rampId = 0; b.x = p.x; b.y = p.y; b.vx = p.tx * 220; b.vy = p.ty * 220;
+      this.audio.sfx('rampDrop');
+      this.history = [];
+      return;
+    }
+    if (b.rs <= 0) {
+      const p = rampPos(r, 0);
+      b.rampId = 0; b.x = p.x; b.y = p.y + 2; b.vx = p.tx * b.rv; b.vy = p.ty * b.rv;
+      return;
+    }
+    const p = rampPos(r, b.rs);
+    b.x = p.x; b.y = p.y; b.vx = p.tx * b.rv; b.vy = p.ty * b.rv;
+  }
+
+  rampMade(r) {
+    this.rampCount++;
+    this.sw();
+    this.fl('ramp' + r.id, 1);
+    this.combo = this.comboT > 0 && this.lastRamp !== r.id ? this.combo + 1 : 1;
+    this.lastRamp = r.id;
+    this.comboT = 7;
+    if (this.multiball) { this.jackpot(); return; }
+    const val = 20000 * this.combo;
+    this.add(val);
+    this.audio.sfx('ramp');
+    if (this.combo > 1) {
+      this.msg([this.combo + 'X COMBO', fmt(val * this.mult())], 1.5);
+      if (this.combo === 3) this.audio.say('Showing off, are we?', 'vesper');
+    } else this.msg([r.name, fmt(val * this.mult())], 1.2);
+    if (this.rampCount % 3 === 0 && !this.kickback) {
+      this.kickback = true;
+      this.msg(['KICKBACK IS LIT']);
+    }
+    if (this.rampCount % 5 === 0) {
+      this.add(100000);
+      this.msg(['BAT SWARM', '100,000']);
+      this.audio.sfx('laugh');
+      this.lightning = 0.4;
     }
   }
 
@@ -472,6 +551,7 @@ export class Game {
     } else {
       this.msg(['GHOST MULTIBALL', 'JACKPOTS ARE LIT'], 3.5);
       this.audio.say('The spirits are loose!', 'vesper', 2);
+      this.audio.sfx('laugh');
     }
   }
 
@@ -526,6 +606,7 @@ export class Game {
     if (this.charging) this.charge = Math.min(1, this.charge + dt / 1.1);
     if (this.ballLive && this.saveT > 0) this.saveT -= dt;
     if (this.skillT > 0) this.skillT -= dt;
+    if (this.comboT > 0) { this.comboT -= dt; if (this.comboT <= 0) this.combo = 0; }
     this.tiltM = Math.max(0, this.tiltM - dt * 0.5);
 
     if (this.room >= 0) {
@@ -556,6 +637,7 @@ export class Game {
         }
         continue;
       }
+      if (b.rampId) { this.rampStep(b, dt); continue; }
       if (b.inLane && b.auto > 0) {
         b.auto -= dt;
         if (b.auto <= 0 && b.y > 985) {
@@ -663,7 +745,10 @@ export class Game {
       : (this.bonus * 1000 + this.rooms.filter(Boolean).length * 25000) * this.bonusX;
     this.mode = 'bonus';
     this.bonusT = 3.2;
-    if (!this.tilted) this.audio.say(pick(DRAIN_QUIPS), 'host');
+    if (!this.tilted) {
+      if (Math.random() < 0.4) this.audio.sfx('laugh');
+      else this.audio.say(pick(DRAIN_QUIPS), 'host');
+    }
   }
 
   afterBonus() {

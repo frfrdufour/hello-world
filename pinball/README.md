@@ -4,7 +4,7 @@ An original haunted-mansion pinball table that runs in the browser. No build ste
 
 ## Two modes
 
-- **Classic:** 90s-style pinball. Physics use real units (millimetres, a 27 mm ball, a 6.5 degree table slope, 30 ms flipper stroke).
+- **Classic:** 90s-style pinball with two ramps, combos, a kickback, multiball and a wizard mode. Physics use real units (millimetres, a 27 mm ball, a 6.5 degree table slope, 30 ms flipper stroke).
 - **Haunted:** the same table bends its own rules. Random hauntings (lights out, moon gravity, tilting house, portals, poltergeist, mirror world), ghost balls, time rewind and walls you draw with the mouse.
 
 Press `H` or use the on-screen switch to change mode at any time.

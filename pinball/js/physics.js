@@ -27,7 +27,7 @@ export function makeBall(x, y) {
   return {
     id: nextId++, x, y, px: x, py: y, vx: 0, vy: 0, r: BALL_R,
     held: 0, lock: false, ghost: false, life: 0, inLane: false, auto: 0,
-    tp: 0, still: 0, sens: {},
+    tp: 0, still: 0, sens: {}, rampId: 0, rs: 0, rv: 0, rc: 0,
   };
 }
 
@@ -146,7 +146,7 @@ export class World {
     const drag = 1 - 0.06 * dt;
     for (let i = 0; i < balls.length; i++) {
       const b = balls[i];
-      if (b.held > 0) continue;
+      if (b.held > 0 || b.rampId) continue;
       b.px = b.x; b.py = b.y;
       b.vx = (b.vx + this.gx * dt) * drag;
       b.vy = (b.vy + this.gy * dt) * drag;
@@ -164,10 +164,10 @@ export class World {
     }
     for (let i = 0; i < balls.length; i++) {
       const a = balls[i];
-      if (a.held > 0) continue;
+      if (a.held > 0 || a.rampId) continue;
       for (let j = i + 1; j < balls.length; j++) {
         const c = balls[j];
-        if (c.held > 0) continue;
+        if (c.held > 0 || c.rampId) continue;
         let nx = a.x - c.x, ny = a.y - c.y;
         const min = a.r + c.r;
         const d2 = nx * nx + ny * ny;
@@ -185,6 +185,6 @@ export class World {
         }
       }
     }
-    if (this.onSub) for (let i = 0; i < balls.length; i++) if (balls[i].held <= 0) this.onSub(balls[i], dt);
+    if (this.onSub) for (let i = 0; i < balls.length; i++) if (balls[i].held <= 0 && !balls[i].rampId) this.onSub(balls[i], dt);
   }
 }

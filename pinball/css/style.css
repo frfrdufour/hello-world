@@ -84,6 +84,11 @@ body:not(.haunted) .haunted-only { display: none; }
   flex: 1; font: inherit; color: var(--muted); background: transparent;
   border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; cursor: pointer; white-space: nowrap;
 }
+.voice-pick { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.voice-pick select {
+  flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 6px;
+}
 .sound button[aria-pressed='true'] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .sound button[aria-pressed='true'] kbd { color: var(--accent-ink); border-color: var(--accent-ink); }
 

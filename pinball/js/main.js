@@ -99,6 +99,23 @@ for (const id of ['muteBtn', 'musicBtn', 'voiceBtn']) {
   });
 }
 
+// Voice picker: lists the English voices this browser has.
+const voicePick = $('voicePick');
+try { audio.voiceName = localStorage.getItem('gravewick-voice') || ''; } catch (e) { /* no storage */ }
+audio.onVoices = () => {
+  const en = audio.voices.filter(v => /^en/i.test(v.lang));
+  voicePick.length = 1;
+  for (const v of en) voicePick.add(new Option(`${v.name} (${v.lang})`, v.name));
+  voicePick.value = en.some(v => v.name === audio.voiceName) ? audio.voiceName : '';
+};
+voicePick.addEventListener('change', () => {
+  audio.init();
+  audio.voiceName = voicePick.value;
+  try { localStorage.setItem('gravewick-voice', audio.voiceName); } catch (e) { /* no storage */ }
+  audio.say('Welcome to Gravewick Manor.', 'host', 2);
+  voicePick.blur();
+});
+
 // Mouse: click to start, drag to draw ectoplasm walls in Haunted mode.
 let drawing = null;
 const pos = e => {

@@ -11,6 +11,43 @@ export const WINDOWS = [
   [241, 690], [188, 690], [294, 690], [188, 735], [241, 625], [294, 735],
 ];
 
+// Ramps are raised wire tracks. A ball that enters one rides the track above the playfield.
+function buildRamp(id, name, gate, ctrl) {
+  const pts = [];
+  const n = ctrl.length;
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = ctrl[Math.max(0, i - 1)], p1 = ctrl[i], p2 = ctrl[i + 1], p3 = ctrl[Math.min(n - 1, i + 2)];
+    for (let k = 0; k < 12; k++) {
+      const t = k / 12, t2 = t * t, t3 = t2 * t;
+      const f = j => 0.5 * (2 * p1[j] + (p2[j] - p0[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2
+        + (3 * p1[j] - p0[j] - 3 * p2[j] + p3[j]) * t3);
+      pts.push([f(0), f(1)]);
+    }
+  }
+  pts.push(ctrl[n - 1]);
+  const cum = [0];
+  let crest = 0, minY = 1e9;
+  for (let i = 1; i < pts.length; i++) {
+    cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    if (pts[i][1] < minY) { minY = pts[i][1]; crest = cum[i]; }
+  }
+  return { id, name, gate, pts, cum, total: cum[cum.length - 1], crest };
+}
+
+// Position and direction at distance s along a ramp.
+export function rampPos(r, s) {
+  const cum = r.cum;
+  let lo = 0, hi = cum.length - 2;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (cum[mid] <= s) lo = mid; else hi = mid - 1;
+  }
+  const a = r.pts[lo], b = r.pts[lo + 1];
+  const len = cum[lo + 1] - cum[lo] || 1;
+  const t = Math.max(0, Math.min(1, (s - cum[lo]) / len));
+  return { x: a[0] + (b[0] - a[0]) * t, y: a[1] + (b[1] - a[1]) * t, tx: (b[0] - a[0]) / len, ty: (b[1] - a[1]) / len };
+}
+
 export function buildTable() {
   const segs = [], circles = [], lines = [], polys = [];
   const wall = (pts, o = {}) => {
@@ -89,5 +126,11 @@ export function buildTable() {
     { id: 'sc', kind: 'scoop', x: SCOOP.x, y: SCOOP.y, r: 11 },
   ];
 
-  return { segs, circles, flippers, lines, polys, sensors, gate };
+  const leftCtrl = [[143, 470], [140, 390], [124, 305], [92, 258], [58, 272], [42, 330], [42, 600], [58, 735], [78, 792]];
+  const ramps = [
+    buildRamp(1, 'STAIRCASE', { x1: 118, x2: 168, y: 470 }, leftCtrl),
+    buildRamp(2, 'BELFRY', { x1: 314, x2: 362, y: 470 }, mir(leftCtrl)),
+  ];
+
+  return { segs, circles, flippers, lines, polys, sensors, gate, ramps };
 }
